@@ -1,1 +1,16 @@
-#
+# Inventory
+
+all:
+  hosts:
+    localhost:
+      ansible_host: "127.0.0.1"
+      customer_name: cturner
+      rhel_version: "10.0"
+      set_release: true
+      modules:
+        - "postgresql:16"
+      packages:
+        - docker
+        - vim-enhanced
+        - vim-minimal
+        - vim-X11
