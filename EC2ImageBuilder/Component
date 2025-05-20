@@ -1,1 +1,59 @@
-#
+
+name: RPMISO
+description: 'Download RPM Updates'
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: InstallPackages
+        action: ExecuteBash
+        inputs:
+          commands:
+            - sudo yum install -y ansible-core mkisofs xorriso createrepo_c
+      - name: MakeRPMDir
+        action: ExecuteBash
+        inputs:
+          commands:
+            - sudo mkdir /root/RPM/
+      - name: DownloadVaultPasswordFile
+        action: S3Download
+        inputs:
+          - source: 's3://S3BUCKET/ansible/vault_password.txt'
+            destination: '/tmp/vault_password.txt' 
+      - name: DownloadRPMISOPlaybook
+        action: S3Download
+        inputs:
+          - source: 's3://S3BUCKET/ansible/rpmiso.yml'
+            destination: '/tmp/rpmiso.yml'      
+      - name: DownloadInventory
+        action: S3Download
+        inputs:
+          - source: 's3://S3BUCKET/ansible/inventory.yml'
+            destination: '/tmp/inventory.yml'
+      - name: DownloadVars
+        action: S3Download
+        inputs:
+          - source: 's3://S3BUCKET/ansible/vars.yml'
+            destination: '/tmp/vars.yml'
+      - name: ChangeVaultPasswordFilePermissions
+        action: ExecuteBash
+        inputs:
+          commands:
+            - chmod 600 /tmp/vault_password.txt
+      - name: InvokeAnsible
+        action: ExecuteBash
+        inputs:
+          commands:
+            - ansible-playbook '{{ build.DownloadRPMISOPlaybook.inputs[0].destination }}' -i '{{ build.DownloadInventory.inputs[0].destination }}' --vault-password-file /tmp/vault_password.txt -vv
+      - name: UploadISOToS3
+        action: S3Upload
+        onFailure: Abort
+        maxAttempts: 3
+        inputs:
+          - source: '/root/RPM/rpmiso.iso'
+            destination: 's3://S3BUCKET/rpmiso.iso'
+      - name: DeleteISO
+        action: ExecuteBash
+        inputs:
+          commands:
+            - rm -rf /root/RPM/
