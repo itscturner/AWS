@@ -23,8 +23,8 @@ phases:
       - name: DownloadRPMISOPlaybook
         action: S3Download
         inputs:
-          - source: 's3://S3BUCKET/ansible/rpmiso.yml'
-            destination: '/tmp/rpmiso.yml'      
+          - source: 's3://S3BUCKET/ansible/playbook.yaml'
+            destination: '/tmp/playbook.yml'      
       - name: DownloadInventory
         action: S3Download
         inputs:
