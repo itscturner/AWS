@@ -24,17 +24,17 @@ phases:
         action: S3Download
         inputs:
           - source: 's3://S3BUCKET/ansible/playbook.yaml'
-            destination: '/tmp/playbook.yml'      
+            destination: '/tmp/playbook.yaml'      
       - name: DownloadInventory
         action: S3Download
         inputs:
-          - source: 's3://S3BUCKET/ansible/inventory.yml'
-            destination: '/tmp/inventory.yml'
+          - source: 's3://S3BUCKET/ansible/inventory.yaml'
+            destination: '/tmp/inventory.yaml'
       - name: DownloadVars
         action: S3Download
         inputs:
-          - source: 's3://S3BUCKET/ansible/vars.yml'
-            destination: '/tmp/vars.yml'
+          - source: 's3://S3BUCKET/ansible/vars.yaml'
+            destination: '/tmp/vars.yaml'
       - name: ChangeVaultPasswordFilePermissions
         action: ExecuteBash
         inputs:
