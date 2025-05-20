@@ -1,1 +1,115 @@
-#
+# Playbook
+
+- name: Download RPM Updates
+  hosts: localhost
+  gather_facts: true
+  connection: local
+  become: true
+  vars_files:
+    - vars.yml
+  tasks:
+
+    - name: Create Repo Directories
+      ansible.builtin.file:
+        path: "/root/RPM/{{ item }}"
+        state: directory
+      with_items:
+        - "RHEL{{ ansible_distribution_major_version }}"
+        - advisories
+        - modules
+
+    - name: Remove Old Yum Repo Files
+      ansible.builtin.file:
+        path: "/etc/yum.repos.d/{{ item }}"
+        state: absent
+      loop:
+        - redhat-rhui-client-config.repo
+        - redhat-rhui.repo
+
+    - name: Register RedHat Subscription Manager
+      ansible.builtin.shell:
+        cmd: "subscription-manager register --username={{ subscription_username }} --password={{ subscription_password }}"
+      no_log: true
+
+    - name: Enable RedHat Subscription Manager Manage Repos
+      ansible.builtin.shell:
+        cmd: "subscription-manager config --rhsm.manage_repos=1"
+
+    - name: Enable RedHat EUS Repos
+      ansible.builtin.shell:
+        cmd: "subscription-manager repos --enable={{ item }}"
+      with_items:
+        - "rhel-{{ ansible_distribution_major_version }}-for-x86_64-baseos-eus-rpms"
+        - "rhel-{{ ansible_distribution_major_version }}-for-x86_64-appstream-eus-rpms"
+
+    - name: Disable RedHat Repos
+      ansible.builtin.shell:
+        cmd: "subscription-manager repos --disable={{ item }}"
+      with_items:
+        - "rhel-{{ ansible_distribution_major_version }}-for-x86_64-baseos-rpms"
+        - "rhel-{{ ansible_distribution_major_version }}-for-x86_64-appstream-rpms"
+    
+    - name: Yum Clean All
+      ansible.builtin.shell:
+        cmd: "yum clean all"
+
+    - name: Set RedHat Release
+      ansible.builtin.shell:
+        cmd: "subscription-manager release --set={{ rhel_version }}"
+      when: set_release == true
+
+    - name: Update RPMs on System
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+
+    - name: Download RPMs from Package List  
+      ansible.builtin.shell:
+        cmd: "dnf download {{ packages | join(' ') }} --resolve --alldeps --downloaddir=/root/RPM/RHEL{{ ansible_distribution_major_version }}/"
+
+    - name: Download RPMs Required For ISO  
+      ansible.builtin.shell:
+        cmd: "dnf download ansible-core createrepo_c mkisofs xorriso --resolve --alldeps --downloaddir=/root/RPM/RHEL{{ ansible_distribution_major_version }}/"
+
+    - name: Set Module Stream Versions
+      ansible.builtin.shell:
+        cmd: "dnf module switch-to -y {{ item }}"
+      with_items: "{{ modules }}"
+      when: modules is defined
+
+    - name: Download Modules 
+      ansible.builtin.shell:
+        cmd: "dnf install -y '@{{ item }}' --downloadonly --downloaddir=/root/RPM/modules/"
+      with_items: "{{ modules }}"
+      when: modules is defined
+
+    - name: Advisories Block
+      block:
+        - name: Unset RedHat Release
+          ansible.builtin.shell:
+            cmd: "subscription-manager release --unset"
+      
+        - name: Download Advisories
+          ansible.builtin.shell:
+            cmd: "dnf download --advisory=RHSA-{{ item }} --resolve --alldeps --downloaddir=/root/RPM/advisories/"
+          loop: "{{ advisories }}"
+      when: advisories is defined
+
+    - name: Create Repo
+      ansible.builtin.shell:
+        cmd: "createrepo --update /root/RPM/"
+
+    - name: Create ISO for RHEL 8
+      ansible.builtin.shell:
+        cmd: "mkisofs -o /root/RPM/{{ customer_name }}_rhel{{ ansible_distribution_major_version }}_rpm.iso /root/RPM/"
+      when: ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] == "8"
+
+    - name: Create ISO for RHEL 9
+      ansible.builtin.shell:
+        cmd: "xorriso -as mkisofs -o /root/RPM/{{ customer_name }}_rhel{{ ansible_distribution_major_version }}_rpm.iso /root/RPM/"
+      when: ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] == "9"
+
+    - name: Unregister RedHat Subscription Manager
+      ansible.builtin.shell:
+        cmd: "subscription-manager unregister"
+      ignore_errors: true
