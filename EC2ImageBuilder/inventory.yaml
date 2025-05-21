@@ -4,7 +4,7 @@ all:
   hosts:
     localhost:
       ansible_host: "127.0.0.1"
-      customer_name: cturner
+      profile: cturner
       rhel_version: "10.0"
       set_release: true
       modules:
